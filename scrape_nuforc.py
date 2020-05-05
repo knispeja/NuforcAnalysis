@@ -1,11 +1,34 @@
 import csv
+import time
+import urllib.error
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 
+def url_open_with_retry(url):
+    delay_backoff = 2
+    for _ in range (web_retries):
+        try:
+            return urlopen(url)
+        except urllib.error.HTTPError as err:
+            print(str(err.code) + ":\'" + url + "\'", end='')
+            return None
+        except Exception as err:
+            time.sleep(delay_backoff)
+            delay_backoff *= 2
+            last_error = err
+            continue
+    
+    return None
+
 destination = r"out.csv"
+web_retries = 10
 
 root_url = r"http://www.nuforc.org/webreports/"
-nuforc_root = urlopen(r"http://www.nuforc.org/webreports/ndxevent.html")
+nuforc_root = url_open_with_retry(r"http://www.nuforc.org/webreports/ndxevent.html")
+if (nuforc_root == None):
+    print('Invalid root URL')
+    exit()
+
 nuforc_root_html = nuforc_root.read()
 
 nuforc_root_soup = BeautifulSoup(nuforc_root_html, 'html.parser')
@@ -26,15 +49,25 @@ with open(destination, "w", newline='', encoding='utf-8') as output_file:
     # Read through the table of dates which contain reports
     for page_link_soup in nuforc_root_soup.find('table').find_all('a'):
         link_to_date_page = page_link_soup.attrs['href']
-        reports_by_date_html = urlopen(root_url + link_to_date_page).read()
+
+        reports_by_date = url_open_with_retry(root_url + link_to_date_page)
+        if (nuforc_root == None):
+            print('\nFailed to open this page. Skipping...')
+            continue
+
+        reports_by_date_html = reports_by_date.read()
         reports_by_date_soup = BeautifulSoup(reports_by_date_html, 'html.parser')
 
-        print(page_link_soup.text)
+        print('\n' + page_link_soup.text)
 
         # Read through the table of reports by date and get a report
         for report_link_soup in reports_by_date_soup.find('table').find_all('a'):
             link_to_report_page = report_link_soup.attrs['href']
-            report_html = urlopen(root_url + link_to_report_page).read()
+            report_reader = url_open_with_retry(root_url + link_to_report_page)
+            if (report_reader == None):
+                print("!" + link_to_report_page + "!", end='')
+
+            report_html = report_reader.read()
             report_soup = BeautifulSoup(report_html, 'html.parser').find('tbody')
 
             # Parse report metadata
