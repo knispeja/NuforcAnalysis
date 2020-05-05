@@ -8,20 +8,20 @@ def url_open_with_retry(url):
     delay_backoff = 2
     for _ in range (web_retries):
         try:
-            return urlopen(url)
+            response = urlopen(url)
+            return response
         except urllib.error.HTTPError as err:
             print(str(err.code) + ":\'" + url + "\'", end='')
             return None
         except Exception as err:
             time.sleep(delay_backoff)
             delay_backoff *= 2
-            last_error = err
             continue
     
     return None
 
 destination = r"out.csv"
-web_retries = 10
+web_retries = 5
 
 root_url = r"http://www.nuforc.org/webreports/"
 nuforc_root = url_open_with_retry(r"http://www.nuforc.org/webreports/ndxevent.html")
@@ -65,7 +65,8 @@ with open(destination, "w", newline='', encoding='utf-8') as output_file:
             link_to_report_page = report_link_soup.attrs['href']
             report_reader = url_open_with_retry(root_url + link_to_report_page)
             if (report_reader == None):
-                print("!" + link_to_report_page + "!", end='')
+                print(" -- Failed: " + link_to_report_page)
+                continue
 
             report_html = report_reader.read()
             report_soup = BeautifulSoup(report_html, 'html.parser').find('tbody')
